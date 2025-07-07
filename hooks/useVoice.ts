@@ -51,7 +51,7 @@ interface UseVoiceReturn extends VoiceState {
 
 export const useVoice = (options: UseVoiceOptions = {}): UseVoiceReturn => {
   const {
-    apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY || '',
+    apiKey = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY || '',
     voiceId: initialVoiceId = VoiceService.VOICES.RACHEL,
     voiceSettings: initialVoiceSettings = {},
     autoPlay = true,

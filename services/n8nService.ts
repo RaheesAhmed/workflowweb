@@ -51,6 +51,7 @@ class N8nService {
 
   // Use Supabase Edge Function proxy for all n8n API calls
   private async makeProxiedN8nRequest(endpoint: string, options: RequestInit = {}) {
+    
     const headers = await this.getAuthHeaders();
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const url = `${baseUrl}/functions/v1/n8n-proxy/proxy${endpoint}`;
@@ -118,7 +119,7 @@ class N8nService {
       const url = `${supabaseUrl}/functions/v1/n8n-proxy/test-connection`;
       
       // Debug logging
-      console.log('VITE_SUPABASE_URL:', supabaseUrl);
+      console.log('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl);
       console.log('Constructed URL:', url);
       console.log('Headers:', headers);
       
