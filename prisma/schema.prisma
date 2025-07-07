@@ -1,0 +1,74 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Optimized workflow templates schema for lightning-fast queries
+model Workflow {
+  id            Int      @id @default(autoincrement())
+  filename      String   @unique
+  name          String
+  active        Boolean  @default(true)
+  triggerType   String   @map("trigger_type")
+  complexity    String   // "Simple", "Medium", "Complex"
+  nodeCount     Int      @map("node_count")
+  integrations  Json     // JSON array of services used
+  description   String?
+  fileHash      String   @map("file_hash") // MD5 for change detection
+  analyzedAt    DateTime @default(now()) @map("analyzed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  favorites    UserWorkflowFavorite[]
+  categories   WorkflowCategoryLink[]
+
+  // Full-text search indexes for PostgreSQL
+  @@index([name])
+  @@index([triggerType])
+  @@index([complexity])
+  @@index([nodeCount])
+  @@map("workflows")
+}
+
+// User favorites and ratings
+model UserWorkflowFavorite {
+  id         Int      @id @default(autoincrement())
+  userId     String   @map("user_id")
+  workflowId Int      @map("workflow_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workflowId])
+  @@map("user_workflow_favorites")
+}
+
+// Workflow categories for better organization
+model WorkflowCategory {
+  id          Int                      @id @default(autoincrement())
+  name        String                   @unique
+  description String?
+  icon        String?                  // Emoji or icon name
+  workflows   WorkflowCategoryLink[]
+  createdAt   DateTime                 @default(now()) @map("created_at")
+
+  @@map("workflow_categories")
+}
+
+model WorkflowCategoryLink {
+  workflowId Int @map("workflow_id")
+  categoryId Int @map("category_id")
+
+  workflow Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  category WorkflowCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([workflowId, categoryId])
+  @@map("workflow_category_links")
+}

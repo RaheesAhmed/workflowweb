@@ -5,6 +5,7 @@
 /.pnp
 .pnp.*
 .yarn/*
+/.cursor/
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
@@ -41,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/lib/generated/prisma
+
+/lib/generated/prisma
