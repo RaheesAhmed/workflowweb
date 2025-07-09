@@ -132,3 +132,31 @@ create trigger handle_n8n_connections_updated_at
 create index n8n_connections_user_id_idx on public.n8n_connections(user_id);
 create index n8n_connections_is_active_idx on public.n8n_connections(is_active);
 create index n8n_connections_status_idx on public.n8n_connections(connection_status); 
+
+
+create table public.workflows (
+  id serial not null,
+  filename text not null,
+  name text not null,
+  active boolean not null default true,
+  trigger_type text not null,
+  complexity text not null,
+  node_count integer not null,
+  integrations jsonb not null,
+  description text null,
+  file_hash text not null,
+  analyzed_at timestamp without time zone not null default CURRENT_TIMESTAMP,
+  created_at timestamp without time zone not null default CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone not null,
+  constraint workflows_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create unique INDEX IF not exists workflows_filename_key on public.workflows using btree (filename) TABLESPACE pg_default;
+
+create index IF not exists workflows_name_idx on public.workflows using btree (name) TABLESPACE pg_default;
+
+create index IF not exists workflows_trigger_type_idx on public.workflows using btree (trigger_type) TABLESPACE pg_default;
+
+create index IF not exists workflows_complexity_idx on public.workflows using btree (complexity) TABLESPACE pg_default;
+
+create index IF not exists workflows_node_count_idx on public.workflows using btree (node_count) TABLESPACE pg_default;

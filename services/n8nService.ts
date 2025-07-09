@@ -300,9 +300,37 @@ class N8nService {
   }
 
   async createWorkflow(workflow: any): Promise<N8nWorkflow> {
+    // Filter out ALL read-only properties that n8n API doesn't accept for creation
+    const {
+      id,
+      active,
+      createdAt,
+      updatedAt,
+      versionId,
+      tags,
+      hash,
+      meta,
+      scopes,
+      ...workflowData
+    } = workflow;
+    
+    // Only keep essential fields that n8n accepts for workflow creation
+    const cleanWorkflow: any = {
+      name: workflowData.name,
+      nodes: workflowData.nodes || [],
+      connections: workflowData.connections || {}
+    };
+    
+    // Add settings only if they exist and are not empty
+    if (workflowData.settings && Object.keys(workflowData.settings).length > 0) {
+      cleanWorkflow.settings = workflowData.settings;
+    }
+    
+    console.log('Creating workflow with clean data:', cleanWorkflow);
+    
     return this.makeProxiedN8nRequest('/workflows', {
       method: 'POST',
-      body: JSON.stringify(workflow),
+      body: JSON.stringify(cleanWorkflow),
     });
   }
 

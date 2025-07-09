@@ -19,6 +19,24 @@ export default function AIPlayground() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clearMessagesTrigger, setClearMessagesTrigger] = useState(0)
+  const [currentChatData, setCurrentChatData] = useState<{
+    messages: any[];
+    title?: string;
+    messageCount: number;
+    hasWorkflows: boolean;
+    type: 'voice' | 'text' | 'mixed';
+  }>({
+    messages: [],
+    messageCount: 0,
+    hasWorkflows: false,
+    type: 'text'
+  })
+
+  // Debug: Log when currentChatData changes
+  useEffect(() => {
+    console.log('currentChatData updated in parent:', currentChatData)
+  }, [currentChatData])
+  const [loadChatData, setLoadChatData] = useState<any>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,7 +60,65 @@ export default function AIPlayground() {
   }
 
   const handleClearMessages = () => {
+    // Clear any loaded chat data for new chat
+    setLoadChatData(null)
     setClearMessagesTrigger(prev => prev + 1)
+  }
+
+  const handleSelectChat = (chatId: string) => {
+    console.log('Selecting chat:', chatId)
+    
+    // Load chat data from localStorage
+    const savedSessions = localStorage.getItem('workflowai_chat_sessions')
+    console.log('Saved sessions:', savedSessions)
+    
+    if (savedSessions) {
+      try {
+        const sessions = JSON.parse(savedSessions)
+        console.log('Parsed sessions:', sessions)
+        const selectedSession = sessions.find((session: any) => session.id === chatId)
+        console.log('Selected session:', selectedSession)
+        
+        if (selectedSession) {
+          // Load the full chat data from localStorage
+          const chatDataKey = `workflowai_chat_${chatId}`
+          console.log('Looking for chat data key:', chatDataKey)
+          const savedChatData = localStorage.getItem(chatDataKey)
+          console.log('Saved chat data:', savedChatData)
+          
+          if (savedChatData) {
+            const chatData = JSON.parse(savedChatData)
+            console.log('Parsed chat data:', chatData)
+            
+            // Set the chat data to load
+            const loadData = {
+              messages: chatData.messages || [],
+              title: selectedSession.title,
+              messageCount: selectedSession.messageCount,
+              hasWorkflows: selectedSession.hasWorkflows,
+              type: selectedSession.type
+            }
+            console.log('Setting load data:', loadData)
+            setLoadChatData(loadData)
+            
+            // Increment clear trigger to load the new chat
+            console.log('Incrementing clearMessagesTrigger')
+            setClearMessagesTrigger(prev => {
+              console.log('clearMessagesTrigger changing from', prev, 'to', prev + 1)
+              return prev + 1
+            })
+          } else {
+            console.log('No saved chat data found for key:', chatDataKey)
+          }
+        } else {
+          console.log('No session found with ID:', chatId)
+        }
+      } catch (error) {
+        console.error('Error loading chat:', error)
+      }
+    } else {
+      console.log('No saved sessions found')
+    }
   }
 
   const handleSidebarToggle = () => {
@@ -59,7 +135,7 @@ export default function AIPlayground() {
 
   if (authLoading || !initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" />
           <p className="text-slate-400">Loading AI Playground...</p>
@@ -85,7 +161,7 @@ export default function AIPlayground() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+    <div className="h-screen bg-slate-900 overflow-hidden">
       <div className="relative h-full">
         {/* Mobile Header - Only visible on mobile */}
         <div className="md:hidden bg-slate-900/90 backdrop-blur-sm border-b border-slate-700/50 px-4 py-3 flex items-center justify-between">
@@ -134,6 +210,8 @@ export default function AIPlayground() {
               collapsed={sidebarCollapsed} 
               onToggle={handleSidebarToggle}
               onClearMessages={handleClearMessages}
+              currentChatData={currentChatData}
+              onSelectChat={handleSelectChat}
             />
           </div>
 
@@ -151,6 +229,8 @@ export default function AIPlayground() {
                   collapsed={false} 
                   onToggle={() => setMobileMenuOpen(false)}
                   onClearMessages={handleClearMessages}
+                  currentChatData={currentChatData}
+                  onSelectChat={handleSelectChat}
                 />
               </div>
             </div>
@@ -159,7 +239,11 @@ export default function AIPlayground() {
           {/* Chat Area */}
           <div className="flex-1 flex justify-center min-w-0">
             <div className="w-full max-w-4xl">
-              <ChatArea clearMessagesTrigger={clearMessagesTrigger} />
+              <ChatArea 
+                clearMessagesTrigger={clearMessagesTrigger} 
+                onChatDataChange={setCurrentChatData}
+                loadChatData={loadChatData}
+              />
             </div>
           </div>
         </div>

@@ -9,6 +9,10 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Logo } from '@/components/Logo'
 import { Welcome } from './Welcome'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { WorkflowArtifact } from './WorkflowArtifact'
+import { isWorkflowJson, extractWorkflowTitle } from '@/utils/workflowDetector'
 import { 
   Mic,
   MicOff,
@@ -60,9 +64,23 @@ interface Message {
 interface ChatAreaProps {
   className?: string
   clearMessagesTrigger?: number
+  onChatDataChange?: (chatData: {
+    messages: any[];
+    title?: string;
+    messageCount: number;
+    hasWorkflows: boolean;
+    type: 'voice' | 'text' | 'mixed';
+  }) => void
+  loadChatData?: {
+    messages: any[];
+    title?: string;
+    messageCount: number;
+    hasWorkflows: boolean;
+    type: 'voice' | 'text' | 'mixed';
+  } | null
 }
 
-export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
+export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, loadChatData }: ChatAreaProps) {
   const { user } = useAuth()
   const { isRecording, startRecording, stopRecording, isSupported } = useVoice()
   const [messages, setMessages] = useState<Message[]>([])
@@ -77,19 +95,50 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
 
   // Clear messages when clearMessagesTrigger changes
   useEffect(() => {
+    console.log('ChatArea useEffect triggered:', { clearMessagesTrigger, loadChatData })
+    
     if (clearMessagesTrigger && clearMessagesTrigger > 0) {
-      setMessages([])
-      setInputText('')
-      setShowWelcome(true)
-      setIsTyping(false)
-      setCurrentStreamingId(null)
-      // Abort any ongoing stream
+      // Abort any ongoing stream first
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
         abortControllerRef.current = null
       }
+      
+      // If we have chat data to load, load it; otherwise clear everything
+      if (loadChatData && loadChatData.messages.length > 0) {
+        console.log('Loading chat data with messages:', loadChatData.messages)
+        // Convert the loaded messages to the correct format
+        const formattedMessages = loadChatData.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp) // Convert timestamp back to Date object
+        }))
+        console.log('Formatted messages:', formattedMessages)
+        setMessages(formattedMessages)
+        setShowWelcome(false) // Hide welcome since we have messages
+      } else {
+        console.log('No load data or empty messages, clearing chat')
+        // Clear for new chat
+      setMessages([])
+        setShowWelcome(true)
+      }
+      
+      setInputText('')
+      setIsTyping(false)
+      setCurrentStreamingId(null)
     }
-  }, [clearMessagesTrigger])
+  }, [clearMessagesTrigger, loadChatData])
+
+  // Clear loadChatData after it's been processed
+  useEffect(() => {
+    if (loadChatData && messages.length > 0) {
+      console.log('Clearing loadChatData after processing')
+      // Clear the load data after the messages have been set
+      const timer = setTimeout(() => {
+        // We'll handle this in the parent component instead
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [loadChatData, messages])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -98,6 +147,49 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Update parent component with current chat data whenever messages change
+  useEffect(() => {
+    console.log('ChatArea onChatDataChange effect triggered, messages count:', messages.length)
+    if (onChatDataChange) {
+      const hasVoiceMessages = messages.some(msg => msg.isVoice)
+      const hasTextMessages = messages.some(msg => !msg.isVoice)
+      const type = hasVoiceMessages && hasTextMessages ? 'mixed' : 
+                   hasVoiceMessages ? 'voice' : 'text'
+      
+      const title = messages.length > 0 ? messages[0].content.slice(0, 50) + '...' : undefined
+      
+      // Check if any assistant message contains a workflow
+      const hasWorkflows = messages.some(msg => 
+        msg.type === 'assistant' && 
+        msg.content.includes('```json') &&
+        // Check if any JSON block is a workflow
+        msg.content.match(/```json\n([\s\S]*?)\n```/g)?.some(block => {
+          const jsonContent = block.replace(/```json\n/, '').replace(/\n```$/, '')
+          return isWorkflowJson(jsonContent)
+        })
+      )
+      
+      const chatData = {
+        messages,
+        title,
+        messageCount: messages.length,
+        hasWorkflows,
+        type
+      }
+      
+      console.log('Calling onChatDataChange with:', chatData)
+      onChatDataChange(chatData as any)
+    }
+  }, [messages, onChatDataChange])
+
+
+
+  // Tool execution is now handled server-side - this is just for display
+  const handleToolExecution = (toolName: string) => {
+    console.log(`Tool executed: ${toolName}`)
+    // Server handles actual execution, this is just for UI feedback
+  }
 
   const handleSendMessage = async (content: string, isVoice = false) => {
     if (!content.trim()) return
@@ -116,6 +208,8 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
     setMessages(prev => [...prev, userMessage])
     setInputText('')
     setIsTyping(true)
+
+    // Reset state for new message
 
     // Create assistant message placeholder for streaming
     const assistantMessageId = (Date.now() + 1).toString()
@@ -150,7 +244,7 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
         body: JSON.stringify({
           messages: claudeMessages,
           config: {
-            model: 'claude-opus-4-20250514',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 4096,
             temperature: 0.7,
             web_search_config: {
@@ -209,6 +303,12 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
                     const results = event.data.content_block.content || []
                     searchResults = results.filter((r: any) => r.type === 'web_search_result')
                   }
+                  // Tool use is now handled server-side
+                  if (event.data.content_block.type === 'tool_use') {
+                    const toolBlock = event.data.content_block
+                    console.log('Tool use detected (handled server-side):', toolBlock)
+                    handleToolExecution(toolBlock.name)
+                  }
                   break
 
                 case 'message_delta':
@@ -223,7 +323,7 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
                   break
 
                 case 'message_stop':
-                  // Finalize the message
+                  // Server handles all tool calls, so we just finalize the message
                   setMessages(prev => prev.map(msg => 
                     msg.id === assistantMessageId 
                       ? { 
@@ -231,17 +331,11 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
                           content: fullContent,
                           isStreaming: false,
                           citations,
-                          searchResults,
-                          workflowGenerated: fullContent.toLowerCase().includes('workflow') || fullContent.toLowerCase().includes('n8n'),
-                          workflowData: fullContent.toLowerCase().includes('workflow') ? {
-                            name: "AI Generated Workflow",
-                            nodes: Math.floor(Math.random() * 10) + 3,
-                            triggers: Math.floor(Math.random() * 3) + 1,
-                            description: "Workflow created based on your requirements"
-                          } : undefined
+                          searchResults
                         }
                       : msg
                   ))
+                  
                   setIsTyping(false)
                   setCurrentStreamingId(null)
                   break
@@ -386,10 +480,87 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
 
                   </div>
                   
-                  <p className="text-sm md:text-base text-slate-300 whitespace-pre-wrap leading-relaxed mb-2 md:mb-3">
-                    {message.content}
-                    {message.isStreaming && <span className="animate-pulse">▊</span>}
-                  </p>
+                  {message.type === 'assistant' ? (
+                    <div className="text-sm md:text-base text-slate-300 leading-relaxed mb-2 md:mb-3 prose prose-invert prose-sm md:prose-base max-w-none">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code: ({ node, inline, className, children, ...props }: any) => {
+                            const match = /language-(\w+)/.exec(className || '')
+                            const language = match ? match[1] : ''
+                            const codeContent = String(children).replace(/\n$/, '')
+                            
+                            // Check if it's a JSON code block that contains a workflow
+                            if (!inline && language === 'json' && isWorkflowJson(codeContent)) {
+                              const workflowTitle = extractWorkflowTitle(codeContent)
+                              return (
+                                <div className="my-4">
+                                  <WorkflowArtifact 
+                                    workflowJson={codeContent}
+                                    title={workflowTitle || undefined}
+                                  />
+                                </div>
+                              )
+                            }
+                            
+                            return !inline ? (
+                              <pre className="bg-slate-800/80 rounded-lg p-3 overflow-x-auto border border-slate-600/50">
+                                <code className={`text-slate-200 ${className}`} {...props}>
+                                  {children}
+                                </code>
+                              </pre>
+                            ) : (
+                              <code className="bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-200 text-sm" {...props}>
+                                {children}
+                              </code>
+                            )
+                          },
+                          h1: ({ children }) => <h1 className="text-xl md:text-2xl font-bold text-slate-200 mb-3">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-lg md:text-xl font-semibold text-slate-200 mb-2">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-base md:text-lg font-medium text-slate-200 mb-2">{children}</h3>,
+                          ul: ({ children }) => <ul className="list-disc list-inside space-y-1 text-slate-300">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 text-slate-300">{children}</ol>,
+                          li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                          p: ({ children }) => <p className="text-slate-300 mb-2">{children}</p>,
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">
+                              {children}
+                            </a>
+                          ),
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-indigo-500/30 pl-4 py-2 bg-indigo-500/5 rounded-r text-slate-300 italic">
+                              {children}
+                            </blockquote>
+                          ),
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full border border-slate-600/50 rounded-lg overflow-hidden">
+                                {children}
+                              </table>
+                            </div>
+                          ),
+                          th: ({ children }) => (
+                            <th className="bg-slate-700/50 px-3 py-2 text-left text-slate-200 font-medium border-b border-slate-600/50">
+                              {children}
+                            </th>
+                          ),
+                          td: ({ children }) => (
+                            <td className="px-3 py-2 text-slate-300 border-b border-slate-600/30">
+                              {children}
+                            </td>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                      {message.isStreaming && <span className="animate-pulse text-indigo-400">▊</span>}
+                    </div>
+                  ) : (
+                    <p className="text-sm md:text-base text-slate-300 whitespace-pre-wrap leading-relaxed mb-2 md:mb-3">
+                      {message.content}
+                      {message.isStreaming && <span className="animate-pulse">▊</span>}
+                    </p>
+                  )}
 
                   {/* Web Search Results */}
                   {message.searchResults && message.searchResults.length > 0 && (
@@ -398,12 +569,12 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
                         <div className="flex items-center gap-2 mb-2">
                           <Search className="w-4 h-4 text-blue-400" />
                           <h4 className="font-semibold text-blue-300 text-sm">Web Search Results</h4>
-                        </div>
+                          </div>
                         <div className="space-y-2">
                           {message.searchResults.map((result, index) => (
                             <div key={index} className="flex items-start gap-2 p-2 bg-blue-500/5 rounded-lg">
                               <ExternalLink className="w-3 h-3 text-blue-400 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0">
                                 <a 
                                   href={result.url} 
                                   target="_blank" 
@@ -449,47 +620,7 @@ export function ChatArea({ className, clearMessagesTrigger }: ChatAreaProps) {
                     </Card>
                   )}
                   
-                  {/* Workflow Generation Card */}
-                  {message.workflowGenerated && message.workflowData && (
-                    <Card className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 backdrop-blur-sm mb-2 md:mb-3">
-                      <CardContent className="p-3 md:p-4">
-                        <div className="flex items-start gap-2 md:gap-3">
-                          <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Zap className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-indigo-300 mb-1 text-sm md:text-base">Workflow Generated</h4>
-                            <h5 className="text-base md:text-lg font-bold text-slate-200 mb-1 md:mb-2">{message.workflowData.name}</h5>
-                            <p className="text-xs md:text-sm text-slate-400 mb-2 md:mb-3">{message.workflowData.description}</p>
-                            <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-3 text-xs md:text-sm text-slate-400">
-                              <span className="flex items-center gap-1">
-                                <FileText className="w-3 h-3" />
-                                {message.workflowData.nodes} nodes
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Play className="w-3 h-3" />
-                                {message.workflowData.triggers} triggers
-                              </span>
-                            </div>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <Button size="sm" className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border-indigo-500/20 text-xs md:text-sm">
-                                <Play className="w-3 h-3 mr-1" />
-                                Preview
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                onClick={() => downloadWorkflow(message.workflowData)}
-                                className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border-emerald-500/20 text-xs md:text-sm"
-                              >
-                                <Download className="w-3 h-3 mr-1" />
-                                Download
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+
 
                   {/* Message Actions */}
                   <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2">

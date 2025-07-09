@@ -67,9 +67,17 @@ interface ChatHistoryProps {
   collapsed?: boolean;
   onToggle?: () => void;
   onClearMessages?: () => void;
+  currentChatData?: {
+    messages: any[];
+    title?: string;
+    messageCount: number;
+    hasWorkflows: boolean;
+    type: 'voice' | 'text' | 'mixed';
+  };
+  onSelectChat?: (chatId: string) => void;
 }
 
-export function ChatHistory({ collapsed = false, onToggle, onClearMessages }: ChatHistoryProps) {
+export function ChatHistory({ collapsed = false, onToggle, onClearMessages, currentChatData, onSelectChat }: ChatHistoryProps) {
   const { activeConnection, workflows, loading: n8nLoading, loadWorkflows, activateWorkflow, deactivateWorkflow } = useN8n()
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -80,76 +88,31 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages }: Ch
   const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Mock data for demonstration
+  // Load sessions from localStorage on component mount
   useEffect(() => {
-    const mockSessions: ChatSession[] = [
-      {
-        id: '1',
-        title: 'Email to Slack Automation',
-        lastMessage: 'Perfect! I\'ll build a comprehensive n8n workflow...',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-        messageCount: 8,
-        isStarred: true,
-        hasWorkflows: true,
-        workflowCount: 2,
-        type: 'mixed'
-      },
-      {
-        id: '2',
-        title: 'Social Media Content Sync',
-        lastMessage: 'I can create a workflow that connects multiple...',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        messageCount: 12,
-        isStarred: false,
-        hasWorkflows: true,
-        workflowCount: 1,
-        type: 'voice'
-      },
-      {
-        id: '3',
-        title: 'Data Backup Scheduler',
-        lastMessage: 'That\'s a great automation idea! Let me help...',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-        messageCount: 6,
-        isStarred: true,
-        hasWorkflows: false,
-        type: 'text'
-      },
-      {
-        id: '4',
-        title: 'Customer Support Router',
-        lastMessage: 'I\'ll help you create a workflow for that!',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
-        messageCount: 15,
-        isStarred: false,
-        hasWorkflows: true,
-        workflowCount: 3,
-        type: 'mixed'
-      },
-      {
-        id: '5',
-        title: 'API Integration Setup',
-        lastMessage: 'Here\'s how you can connect those services...',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
-        messageCount: 9,
-        isStarred: false,
-        hasWorkflows: false,
-        type: 'text'
-      },
-      {
-        id: '6',
-        title: 'Webhook Processing Flow',
-        lastMessage: 'Let me generate a workflow that handles...',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago
-        messageCount: 7,
-        isStarred: true,
-        hasWorkflows: true,
-        workflowCount: 1,
-        type: 'voice'
+    const savedSessions = localStorage.getItem('workflowai_chat_sessions')
+    if (savedSessions) {
+      try {
+        const parsed = JSON.parse(savedSessions)
+        // Convert timestamp strings back to Date objects
+        const sessionsWithDates = parsed.map((session: any) => ({
+          ...session,
+          timestamp: new Date(session.timestamp)
+        }))
+        setSessions(sessionsWithDates)
+      } catch (error) {
+        console.error('Error loading sessions from localStorage:', error)
+        setSessions([])
       }
-    ]
-    setSessions(mockSessions)
+    }
   }, [])
+
+  // Save sessions to localStorage whenever sessions change
+  useEffect(() => {
+    if (sessions.length > 0) {
+      localStorage.setItem('workflowai_chat_sessions', JSON.stringify(sessions))
+    }
+  }, [sessions])
 
   const filteredSessions = sessions.filter(session => {
     const matchesSearch = session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -206,7 +169,48 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages }: Ch
   }
 
   const createNewChat = () => {
-    // Clear messages without reloading the page
+    console.log('createNewChat called, currentChatData:', currentChatData)
+    
+    // Save current chat if it has any messages
+    if (currentChatData && currentChatData.messages.length > 0) {
+      console.log('Chat has messages, proceeding to save...')
+      const lastMessage = currentChatData.messages[currentChatData.messages.length - 1]
+      const title = currentChatData.title || 
+                   (currentChatData.messages.length > 0 ? 
+                    currentChatData.messages[0].content.slice(0, 50) + '...' : 
+                    'New Chat')
+      
+      const sessionId = Date.now().toString()
+      
+      const newSession: ChatSession = {
+        id: sessionId,
+        title,
+        lastMessage: lastMessage.content.slice(0, 100),
+        timestamp: new Date(),
+        messageCount: currentChatData.messageCount,
+        isStarred: false,
+        hasWorkflows: currentChatData.hasWorkflows,
+        workflowCount: 0,
+        type: currentChatData.type
+      }
+      
+      // Save the session metadata
+      setSessions(prev => [newSession, ...prev])
+      
+      // Save the complete chat data separately
+      const chatDataKey = `workflowai_chat_${sessionId}`
+      const chatDataToSave = {
+        messages: currentChatData.messages,
+        title,
+        timestamp: new Date(),
+        type: currentChatData.type
+      }
+      console.log('Saving chat data to localStorage:', chatDataKey, chatDataToSave)
+      localStorage.setItem(chatDataKey, JSON.stringify(chatDataToSave))
+    }
+    
+    // Clear messages to start new chat
+    console.log('Calling onClearMessages')
     if (onClearMessages) {
       onClearMessages()
     }
@@ -551,7 +555,8 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages }: Ch
           ) : (
             <div className="p-2 md:p-4 space-y-2 md:space-y-3">
               {filteredSessions.map((session) => (
-                <Card key={session.id} className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 hover:border-indigo-500/30 transition-all duration-300 group">
+                <Card key={session.id} className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 hover:border-indigo-500/30 transition-all duration-300 group cursor-pointer" 
+                      onClick={() => onSelectChat && onSelectChat(session.id)}>
                   <CardContent className="p-3 md:p-4">
                     <div className="flex items-start gap-2 md:gap-3">
                       <div className="flex-1 min-w-0">
@@ -625,6 +630,10 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages }: Ch
                         <div className="grid grid-cols-2 gap-1 md:gap-2">
                           <Button
                             size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectChat && onSelectChat(session.id);
+                            }}
                             className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border-indigo-500/20 text-xs h-7 md:h-8"
                           >
                             <MessageSquare className="w-3 h-3 mr-1" />
