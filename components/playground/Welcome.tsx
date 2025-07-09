@@ -50,7 +50,7 @@ export function Welcome({ onSelectSolution }: WelcomeProps) {
   ]
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 w-full">
       {/* Header */}
       <div className="text-center mb-4 md:mb-6">
         <h2 className="text-lg md:text-xl font-bold text-slate-200 mb-2">

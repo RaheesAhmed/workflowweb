@@ -10,6 +10,7 @@ import { ConnectionSetup } from '@/components/ConnectionSetup'
 import { Logo } from '@/components/Logo'
 import { Loader2, AlertCircle, Database, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { isWorkflowJson } from '@/utils/workflowDetector'
 
 export default function AIPlayground() {
   const { user, loading: authLoading } = useAuth()
@@ -19,16 +20,36 @@ export default function AIPlayground() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clearMessagesTrigger, setClearMessagesTrigger] = useState(0)
+  const [refreshSessionsTrigger, setRefreshSessionsTrigger] = useState(0)
+
+  // Function to recalculate workflow count from messages
+  const calculateWorkflowCount = (messages: any[]): number => {
+    let workflowCount = 0
+    messages.forEach(msg => {
+      if (msg.type === 'assistant' && msg.content.includes('```json')) {
+        const jsonBlocks = msg.content.match(/```json\n([\s\S]*?)\n```/g) || []
+        jsonBlocks.forEach((block: string) => {
+          const jsonContent = block.replace(/```json\n/, '').replace(/\n```$/, '')
+          if (isWorkflowJson(jsonContent)) {
+            workflowCount++
+          }
+        })
+      }
+    })
+    return workflowCount
+  }
   const [currentChatData, setCurrentChatData] = useState<{
     messages: any[];
     title?: string;
     messageCount: number;
     hasWorkflows: boolean;
+    workflowCount: number;
     type: 'voice' | 'text' | 'mixed';
   }>({
     messages: [],
     messageCount: 0,
     hasWorkflows: false,
+    workflowCount: 0,
     type: 'text'
   })
 
@@ -90,16 +111,37 @@ export default function AIPlayground() {
             const chatData = JSON.parse(savedChatData)
             console.log('Parsed chat data:', chatData)
             
+            // Recalculate workflow count from actual messages (in case old sessions have wrong count)
+            const messages = chatData.messages || []
+            const actualWorkflowCount = calculateWorkflowCount(messages)
+            const hasWorkflows = actualWorkflowCount > 0
+            console.log('Recalculated workflow count:', actualWorkflowCount, 'hasWorkflows:', hasWorkflows)
+            
             // Set the chat data to load
             const loadData = {
-              messages: chatData.messages || [],
+              messages: messages,
               title: selectedSession.title,
               messageCount: selectedSession.messageCount,
-              hasWorkflows: selectedSession.hasWorkflows,
+              hasWorkflows: hasWorkflows,
+              workflowCount: actualWorkflowCount,
               type: selectedSession.type
             }
             console.log('Setting load data:', loadData)
             setLoadChatData(loadData)
+            
+            // Update the saved session with correct workflow count (for future loads)
+            if (actualWorkflowCount !== selectedSession.workflowCount || hasWorkflows !== selectedSession.hasWorkflows) {
+              const updatedSessions = sessions.map((session: any) => 
+                session.id === chatId 
+                  ? { ...session, hasWorkflows: hasWorkflows, workflowCount: actualWorkflowCount }
+                  : session
+              )
+              localStorage.setItem('workflowai_chat_sessions', JSON.stringify(updatedSessions))
+              
+              // Trigger refresh of ChatHistory component to show updated workflow counts
+              console.log('Triggering ChatHistory refresh to show updated workflow counts')
+              setRefreshSessionsTrigger(prev => prev + 1)
+            }
             
             // Increment clear trigger to load the new chat
             console.log('Incrementing clearMessagesTrigger')
@@ -212,6 +254,7 @@ export default function AIPlayground() {
               onClearMessages={handleClearMessages}
               currentChatData={currentChatData}
               onSelectChat={handleSelectChat}
+              refreshTrigger={refreshSessionsTrigger}
             />
           </div>
 
@@ -231,6 +274,7 @@ export default function AIPlayground() {
                   onClearMessages={handleClearMessages}
                   currentChatData={currentChatData}
                   onSelectChat={handleSelectChat}
+                  refreshTrigger={refreshSessionsTrigger}
                 />
               </div>
             </div>

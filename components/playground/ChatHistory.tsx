@@ -72,12 +72,14 @@ interface ChatHistoryProps {
     title?: string;
     messageCount: number;
     hasWorkflows: boolean;
+    workflowCount: number;
     type: 'voice' | 'text' | 'mixed';
   };
   onSelectChat?: (chatId: string) => void;
+  refreshTrigger?: number;
 }
 
-export function ChatHistory({ collapsed = false, onToggle, onClearMessages, currentChatData, onSelectChat }: ChatHistoryProps) {
+export function ChatHistory({ collapsed = false, onToggle, onClearMessages, currentChatData, onSelectChat, refreshTrigger }: ChatHistoryProps) {
   const { activeConnection, workflows, loading: n8nLoading, loadWorkflows, activateWorkflow, deactivateWorkflow } = useN8n()
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -88,8 +90,8 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
   const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Load sessions from localStorage on component mount
-  useEffect(() => {
+  // Function to load sessions from localStorage
+  const loadSessionsFromStorage = () => {
     const savedSessions = localStorage.getItem('workflowai_chat_sessions')
     if (savedSessions) {
       try {
@@ -105,7 +107,20 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
         setSessions([])
       }
     }
+  }
+
+  // Load sessions from localStorage on component mount
+  useEffect(() => {
+    loadSessionsFromStorage()
   }, [])
+
+  // Refresh sessions when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      console.log('ChatHistory: Refreshing sessions from localStorage due to refreshTrigger:', refreshTrigger)
+      loadSessionsFromStorage()
+    }
+  }, [refreshTrigger])
 
   // Save sessions to localStorage whenever sessions change
   useEffect(() => {
@@ -190,7 +205,7 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
         messageCount: currentChatData.messageCount,
         isStarred: false,
         hasWorkflows: currentChatData.hasWorkflows,
-        workflowCount: 0,
+        workflowCount: currentChatData.workflowCount || 0,
         type: currentChatData.type
       }
       
@@ -333,7 +348,10 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
             className="p-0 hover:scale-105 transition-all duration-200 group"
             title="Expand sidebar"
           >
-                         <Logo size={window.innerWidth < 768 ? 32 : 40} className="drop-shadow-lg" />
+            <Logo 
+              size={window.innerWidth < 768 ? 32 : 40} 
+              className="drop-shadow-lg flex-shrink-0" 
+            />
           </button>
         </div>
 
@@ -381,7 +399,10 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
               className="p-1 md:p-2 hover:bg-slate-800/50 rounded-xl transition-all duration-200 group"
               title="Collapse sidebar"
             >
-              <Logo size={window.innerWidth < 768 ? 24 : 32} className="drop-shadow-lg group-hover:scale-105 transition-transform duration-200" />
+              <Logo 
+                size={window.innerWidth < 768 ? 24 : 32} 
+                className="drop-shadow-lg group-hover:scale-105 transition-transform duration-200 flex-shrink-0" 
+              />
             </button>
           </div>
           <div className="flex items-center gap-1 md:gap-2">

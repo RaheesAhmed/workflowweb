@@ -69,6 +69,7 @@ interface ChatAreaProps {
     title?: string;
     messageCount: number;
     hasWorkflows: boolean;
+    workflowCount: number;
     type: 'voice' | 'text' | 'mixed';
   }) => void
   loadChatData?: {
@@ -76,6 +77,7 @@ interface ChatAreaProps {
     title?: string;
     messageCount: number;
     hasWorkflows: boolean;
+    workflowCount: number;
     type: 'voice' | 'text' | 'mixed';
   } | null
 }
@@ -159,22 +161,28 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
       
       const title = messages.length > 0 ? messages[0].content.slice(0, 50) + '...' : undefined
       
-      // Check if any assistant message contains a workflow
-      const hasWorkflows = messages.some(msg => 
-        msg.type === 'assistant' && 
-        msg.content.includes('```json') &&
-        // Check if any JSON block is a workflow
-        msg.content.match(/```json\n([\s\S]*?)\n```/g)?.some(block => {
-          const jsonContent = block.replace(/```json\n/, '').replace(/\n```$/, '')
-          return isWorkflowJson(jsonContent)
-        })
-      )
+      // Count workflows in assistant messages
+      let workflowCount = 0
+      messages.forEach(msg => {
+        if (msg.type === 'assistant' && msg.content.includes('```json')) {
+          const jsonBlocks = msg.content.match(/```json\n([\s\S]*?)\n```/g) || []
+          jsonBlocks.forEach(block => {
+            const jsonContent = block.replace(/```json\n/, '').replace(/\n```$/, '')
+            if (isWorkflowJson(jsonContent)) {
+              workflowCount++
+            }
+          })
+        }
+      })
+      
+      const hasWorkflows = workflowCount > 0
       
       const chatData = {
         messages,
         title,
         messageCount: messages.length,
         hasWorkflows,
+        workflowCount,
         type
       }
       
@@ -446,7 +454,11 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
         
         {/* Welcome Component - Show when no messages */}
         {showWelcome && (
-          <Welcome onSelectSolution={handleSolutionSelect} />
+          <div className="flex items-center justify-center min-h-[calc(100vh-200px)] w-full">
+            <div className="w-full max-w-6xl mx-auto">
+              <Welcome onSelectSolution={handleSolutionSelect} />
+            </div>
+          </div>
         )}
         
         {messages.map((message) => (
@@ -464,7 +476,10 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                       {user?.email?.charAt(0).toUpperCase() || 'U'}
                     </span>
                   ) : (
-                    <Logo size={typeof window !== 'undefined' && window.innerWidth < 768 ? 24 : 32} />
+                    <Logo 
+                      size={typeof window !== 'undefined' && window.innerWidth < 768 ? 24 : 32} 
+                      className="flex-shrink-0"
+                    />
                   )}
                 </div>
                 
@@ -669,57 +684,53 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Sticky to Bottom */}
-      <div className="flex-shrink-0 p-2 md:p-4 border-t border-slate-700/50">
-        <div className="flex gap-2 md:gap-3">
-          <div className="flex-1 relative">
+      {/* Compact Input Area */}
+      <div className="flex-shrink-0 p-3">
+        <div className="flex items-end gap-2 bg-slate-800/60 rounded-lg border border-slate-700/50 px-3 py-2">
+          {/* Text Input */}
+          <div className="flex-1">
             <Textarea
               ref={textareaRef}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Describe the workflow you want to create..."
-              className="min-h-[44px] md:min-h-[52px] max-h-32 resize-none bg-slate-800/50 border-slate-600 focus:border-indigo-500 focus:ring-indigo-500/20 text-slate-200 placeholder-slate-500 pr-10 md:pr-12 text-sm md:text-base"
+              className="min-h-[40px] max-h-32 resize-none bg-transparent border-none focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none outline-none ring-0 text-slate-200 placeholder-slate-400 text-sm w-full"
               disabled={isTyping}
+              style={{ outline: 'none', boxShadow: 'none' }}
             />
-            <Button
-              onClick={() => handleSendMessage(inputText)}
-              disabled={!inputText.trim() || isTyping}
-              size="sm"
-              className="absolute right-1 md:right-2 top-1 md:top-2 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed h-8 w-8 md:h-10 md:w-10 p-0"
-            >
-              {isTyping ? (
-                <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" />
-              ) : (
-                <Send className="w-3 h-3 md:w-4 md:h-4" />
-              )}
-            </Button>
           </div>
 
-          {/* Voice Button */}
-          <div className="flex flex-col items-center justify-center">
-            <Button
-              onClick={handleVoiceRecording}
-              disabled={!isSupported || isTyping}
-              className={`w-11 h-11 md:w-14 md:h-14 rounded-full transition-all duration-300 ${
-                isRecording
-                  ? 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 animate-pulse'
-                  : 'bg-gradient-to-br from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 hover:scale-105'
-              } shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {isRecording ? (
-                <StopCircle className="w-4 h-4 md:w-6 md:h-6 text-white" />
-              ) : (
-                <Mic className="w-4 h-4 md:w-6 md:h-6 text-white" />
-              )}
-            </Button>
-            {isRecording && (
-              <div className="flex items-center gap-1 mt-1 md:mt-2">
-                <div className="w-1 h-1 bg-red-400 rounded-full animate-pulse"></div>
-                <span className="text-xs text-red-400 font-medium">Recording</span>
-              </div>
+          {/* Send Button */}
+          <Button
+            onClick={() => handleSendMessage(inputText)}
+            disabled={!inputText.trim() || isTyping}
+            size="sm"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 p-0 rounded-md flex-shrink-0"
+          >
+            {isTyping ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
             )}
-          </div>
+          </Button>
+
+          {/* Voice Button */}
+          <Button
+            onClick={handleVoiceRecording}
+            disabled={!isSupported || isTyping}
+            className={`w-8 h-8 rounded-md transition-all duration-200 flex-shrink-0 ${
+              isRecording
+                ? 'bg-red-600 hover:bg-red-700 animate-pulse'
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            } text-white disabled:opacity-50`}
+          >
+            {isRecording ? (
+              <StopCircle className="w-4 h-4" />
+            ) : (
+              <Mic className="w-4 h-4" />
+            )}
+          </Button>
         </div>
       </div>
     </div>
