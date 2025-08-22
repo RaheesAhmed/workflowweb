@@ -12,6 +12,7 @@ import { Welcome } from './Welcome'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { WorkflowArtifact } from './WorkflowArtifact'
+import { WebSearchResults } from './WebSearchResults'
 import { isWorkflowJson, extractWorkflowTitle } from '@/utils/workflowDetector'
 import { 
   Mic,
@@ -48,6 +49,13 @@ interface WebSearchResult {
   url: string;
   title: string;
   page_age?: string;
+  encrypted_content?: string;
+}
+
+interface WebSearchQuery {
+  query: string;
+  results: WebSearchResult[];
+  timestamp?: Date;
 }
 
 interface Message {
@@ -61,6 +69,7 @@ interface Message {
   workflowData?: any
   citations?: Citation[]
   searchResults?: WebSearchResult[]
+  searchQueries?: WebSearchQuery[]
   isStreaming?: boolean
 }
 
@@ -281,6 +290,8 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
       let fullContent = ''
       let citations: Citation[] = []
       let searchResults: WebSearchResult[] = []
+      let searchQueries: WebSearchQuery[] = []
+      let currentSearchQuery = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -309,11 +320,30 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                   break
 
                 case 'content_block_start':
-                  if (event.data.content_block.type === 'web_search_tool_result') {
-                    // Extract search results
-                    const results = event.data.content_block.content || []
-                    searchResults = results.filter((r: any) => r.type === 'web_search_result')
+                  // Capture server tool use (web search queries)
+                  if (event.data.content_block.type === 'server_tool_use' && event.data.content_block.name === 'web_search') {
+                    currentSearchQuery = event.data.content_block.input?.query || ''
+                    console.log('Web search query detected:', currentSearchQuery)
                   }
+                  
+                  if (event.data.content_block.type === 'web_search_tool_result') {
+                    // Extract search results and associate with current query
+                    const results = event.data.content_block.content || []
+                    const webResults = results.filter((r: any) => r.type === 'web_search_result')
+                    
+                    if (currentSearchQuery && webResults.length > 0) {
+                      searchQueries.push({
+                        query: currentSearchQuery,
+                        results: webResults,
+                        timestamp: new Date()
+                      })
+                      console.log('Added search query with results:', currentSearchQuery, webResults.length)
+                    }
+                    
+                    // Keep backward compatibility
+                    searchResults = webResults
+                  }
+                  
                   // Tool use is now handled server-side
                   if (event.data.content_block.type === 'tool_use') {
                     const toolBlock = event.data.content_block
@@ -342,7 +372,8 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                           content: fullContent,
                           isStreaming: false,
                           citations,
-                          searchResults
+                          searchResults,
+                          searchQueries
                         }
                       : msg
                   ))
@@ -659,36 +690,23 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                     </p>
                   )}
 
-                  {/* Web Search Results */}
-                  {message.searchResults && message.searchResults.length > 0 && (
-                    <Card className="bg-blue-500/10 border border-blue-500/30 backdrop-blur-sm mb-2 md:mb-3">
-                      <CardContent className="p-3 md:p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Search className="w-4 h-4 text-blue-400" />
-                          <h4 className="font-semibold text-blue-300 text-sm">Web Search Results</h4>
-                          </div>
-                        <div className="space-y-2">
-                          {message.searchResults.map((result, index) => (
-                            <div key={index} className="flex items-start gap-2 p-2 bg-blue-500/5 rounded-lg">
-                              <ExternalLink className="w-3 h-3 text-blue-400 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                                <a 
-                                  href={result.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-300 hover:text-blue-200 text-sm font-medium line-clamp-1"
-                                >
-                                  {result.title}
-                                </a>
-                                {result.page_age && (
-                                  <p className="text-xs text-slate-400">Updated: {result.page_age}</p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
+                  {/* Web Search Results - New Enhanced Component */}
+                  {(message.searchQueries && message.searchQueries.length > 0) ? (
+                    <WebSearchResults 
+                      searchQueries={message.searchQueries} 
+                      className="mb-2 md:mb-3"
+                    />
+                  ) : (
+                    message.searchResults && message.searchResults.length > 0 && (
+                      <WebSearchResults 
+                        searchQueries={[{
+                          query: 'Web search results',
+                          results: message.searchResults,
+                          timestamp: message.timestamp
+                        }]} 
+                        className="mb-2 md:mb-3"
+                      />
+                    )
                   )}
 
                   {/* Citations */}
@@ -797,22 +815,6 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
             )}
           </Button>
 
-          {/* Voice Button */}
-          <Button
-            onClick={handleVoiceRecording}
-            disabled={!isSupported || isTyping}
-            className={`w-8 h-8 rounded-md transition-all duration-200 flex-shrink-0 ${
-              isRecording
-                ? 'bg-red-600 hover:bg-red-700 animate-pulse'
-                : 'bg-indigo-600 hover:bg-indigo-700'
-            } text-white disabled:opacity-50`}
-          >
-            {isRecording ? (
-              <StopCircle className="w-4 h-4" />
-            ) : (
-              <Mic className="w-4 h-4" />
-            )}
-          </Button>
         </div>
       </div>
     </div>

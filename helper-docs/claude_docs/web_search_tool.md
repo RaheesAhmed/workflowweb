@@ -2,9 +2,6 @@
 
 The web search tool gives Claude direct access to real-time web content, allowing it to answer questions with up-to-date information beyond its knowledge cutoff. Claude automatically cites sources from search results as part of its answer.
 
-<Note>
-  Please reach out through our [feedback form](https://forms.gle/sWjBtsrNEY2oKGuE8) to share your experience with the web search tool.
-</Note>
 
 ## Supported models
 
@@ -26,57 +23,11 @@ When you add the web search tool to your API request:
 
 ## How to use web search
 
-<Note>
-  Your organization's administrator must enable web search in [Console](https://console.anthropic.com/settings/privacy).
-</Note>
+
 
 Provide the web search tool in your API request:
 
-<CodeGroup>
-  ```bash Shell
-  curl https://api.anthropic.com/v1/messages \
-      --header "x-api-key: $ANTHROPIC_API_KEY" \
-      --header "anthropic-version: 2023-06-01" \
-      --header "content-type: application/json" \
-      --data '{
-          "model": "claude-opus-4-20250514",
-          "max_tokens": 1024,
-          "messages": [
-              {
-                  "role": "user",
-                  "content": "How do I update a web app to TypeScript 5.5?"
-              }
-          ],
-          "tools": [{
-              "type": "web_search_20250305",
-              "name": "web_search",
-              "max_uses": 5
-          }]
-      }'
-  ```
 
-```python Python
-import anthropic
-
-client = anthropic.Anthropic()
-
-response = client.messages.create(
-    model="claude-opus-4-20250514",
-    max_tokens=1024,
-    messages=[
-        {
-            "role": "user",
-            "content": "How do I update a web app to TypeScript 5.5?"
-        }
-    ],
-    tools=[{
-        "type": "web_search_20250305",
-        "name": "web_search",
-        "max_uses": 5
-    }]
-)
-print(response)
-```
 
 ```typescript TypeScript
 import { Anthropic } from "@anthropic-ai/sdk";
@@ -108,7 +59,7 @@ async function main() {
 main().catch(console.error);
 ```
 
-</CodeGroup>
+
 
 ### Tool definition
 
