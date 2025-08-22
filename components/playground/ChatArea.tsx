@@ -30,7 +30,10 @@ import {
   StopCircle,
   Play,
   Search,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Brain
 } from 'lucide-react'
 
 interface Citation {
@@ -439,6 +442,71 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
     setCurrentStreamingId(null)
   }
 
+  // Function to parse thinking content from message
+  const parseThinkingContent = (content: string) => {
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g
+    const matches = []
+    let match
+    
+    while ((match = thinkingRegex.exec(content)) !== null) {
+      matches.push({
+        full: match[0],
+        content: match[1].trim()
+      })
+    }
+    
+    return {
+      hasThinking: matches.length > 0,
+      thinkingBlocks: matches,
+      contentWithoutThinking: content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim()
+    }
+  }
+
+  // Compact thinking component - just a brain icon
+  const ThinkingBlock = ({ content, index }: { content: string; index: number }) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+    
+    return (
+      <div className="inline-flex items-center gap-2 mb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-6 w-6 p-0 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30"
+          title="View Thinking Process"
+        >
+          <Brain className="w-3 h-3 text-purple-400" />
+        </Button>
+        
+        {isExpanded && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setIsExpanded(false)}>
+            <div className="bg-slate-800 border border-purple-500/30 rounded-lg max-w-2xl max-h-96 overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-3 border-b border-purple-500/20 bg-purple-500/10">
+                <div className="flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm font-medium text-purple-300">Thinking Process</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsExpanded(false)}
+                  className="h-6 w-6 p-0 text-slate-400 hover:text-slate-300"
+                >
+                  ×
+                </Button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-80">
+                <pre className="text-sm text-purple-200 whitespace-pre-wrap font-mono">
+                  {content}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Messages - Full Height */}
@@ -497,78 +565,92 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                   
                   {message.type === 'assistant' ? (
                     <div className="text-sm md:text-base text-slate-300 leading-relaxed mb-2 md:mb-3 prose prose-invert prose-sm md:prose-base max-w-none">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          code: ({ node, inline, className, children, ...props }: any) => {
-                            const match = /language-(\w+)/.exec(className || '')
-                            const language = match ? match[1] : ''
-                            const codeContent = String(children).replace(/\n$/, '')
+                      {(() => {
+                        const { hasThinking, thinkingBlocks, contentWithoutThinking } = parseThinkingContent(message.content)
+                        
+                        return (
+                          <>
+                            {/* Render thinking blocks first */}
+                            {hasThinking && thinkingBlocks.map((block, index) => (
+                              <ThinkingBlock key={index} content={block.content} index={index} />
+                            ))}
                             
-                            // Check if it's a JSON code block that contains a workflow
-                            if (!inline && language === 'json' && isWorkflowJson(codeContent)) {
-                              const workflowTitle = extractWorkflowTitle(codeContent)
-                              return (
-                                <div className="my-4">
-                                  <WorkflowArtifact 
-                                    workflowJson={codeContent}
-                                    title={workflowTitle || undefined}
-                                  />
-                                </div>
-                              )
-                            }
-                            
-                            return !inline ? (
-                              <pre className="bg-slate-800/80 rounded-lg p-3 overflow-x-auto border border-slate-600/50">
-                                <code className={`text-slate-200 ${className}`} {...props}>
-                                  {children}
-                                </code>
-                              </pre>
-                            ) : (
-                              <code className="bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-200 text-sm" {...props}>
-                                {children}
-                              </code>
-                            )
-                          },
-                          h1: ({ children }) => <h1 className="text-xl md:text-2xl font-bold text-slate-200 mb-3">{children}</h1>,
-                          h2: ({ children }) => <h2 className="text-lg md:text-xl font-semibold text-slate-200 mb-2">{children}</h2>,
-                          h3: ({ children }) => <h3 className="text-base md:text-lg font-medium text-slate-200 mb-2">{children}</h3>,
-                          ul: ({ children }) => <ul className="list-disc list-inside space-y-1 text-slate-300">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 text-slate-300">{children}</ol>,
-                          li: ({ children }) => <li className="text-slate-300">{children}</li>,
-                          p: ({ children }) => <p className="text-slate-300 mb-2">{children}</p>,
-                          a: ({ href, children }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">
-                              {children}
-                            </a>
-                          ),
-                          blockquote: ({ children }) => (
-                            <blockquote className="border-l-4 border-indigo-500/30 pl-4 py-2 bg-indigo-500/5 rounded-r text-slate-300 italic">
-                              {children}
-                            </blockquote>
-                          ),
-                          table: ({ children }) => (
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full border border-slate-600/50 rounded-lg overflow-hidden">
-                                {children}
-                              </table>
-                            </div>
-                          ),
-                          th: ({ children }) => (
-                            <th className="bg-slate-700/50 px-3 py-2 text-left text-slate-200 font-medium border-b border-slate-600/50">
-                              {children}
-                            </th>
-                          ),
-                          td: ({ children }) => (
-                            <td className="px-3 py-2 text-slate-300 border-b border-slate-600/30">
-                              {children}
-                            </td>
-                          ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                      {message.isStreaming && <span className="animate-pulse text-indigo-400">▊</span>}
+                            {/* Render main content without thinking tags */}
+                            <ReactMarkdown 
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                code: ({ node, inline, className, children, ...props }: any) => {
+                                  const match = /language-(\w+)/.exec(className || '')
+                                  const language = match ? match[1] : ''
+                                  const codeContent = String(children).replace(/\n$/, '')
+                                  
+                                  // Check if it's a JSON code block that contains a workflow
+                                  if (!inline && language === 'json' && isWorkflowJson(codeContent)) {
+                                    const workflowTitle = extractWorkflowTitle(codeContent)
+                                    return (
+                                      <div className="my-4">
+                                        <WorkflowArtifact 
+                                          workflowJson={codeContent}
+                                          title={workflowTitle || undefined}
+                                        />
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  return !inline ? (
+                                    <pre className="bg-slate-800/80 rounded-lg p-3 overflow-x-auto border border-slate-600/50">
+                                      <code className={`text-slate-200 ${className}`} {...props}>
+                                        {children}
+                                      </code>
+                                    </pre>
+                                  ) : (
+                                    <code className="bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-200 text-sm" {...props}>
+                                      {children}
+                                    </code>
+                                  )
+                                },
+                                h1: ({ children }) => <h1 className="text-xl md:text-2xl font-bold text-slate-200 mb-3">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-lg md:text-xl font-semibold text-slate-200 mb-2">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-base md:text-lg font-medium text-slate-200 mb-2">{children}</h3>,
+                                ul: ({ children }) => <ul className="list-disc list-inside space-y-1 text-slate-300">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 text-slate-300">{children}</ol>,
+                                li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                                p: ({ children }) => <p className="text-slate-300 mb-2">{children}</p>,
+                                a: ({ href, children }) => (
+                                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">
+                                    {children}
+                                  </a>
+                                ),
+                                blockquote: ({ children }) => (
+                                  <blockquote className="border-l-4 border-indigo-500/30 pl-4 py-2 bg-indigo-500/5 rounded-r text-slate-300 italic">
+                                    {children}
+                                  </blockquote>
+                                ),
+                                table: ({ children }) => (
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full border border-slate-600/50 rounded-lg overflow-hidden">
+                                      {children}
+                                    </table>
+                                  </div>
+                                ),
+                                th: ({ children }) => (
+                                  <th className="bg-slate-700/50 px-3 py-2 text-left text-slate-200 font-medium border-b border-slate-600/50">
+                                    {children}
+                                  </th>
+                                ),
+                                td: ({ children }) => (
+                                  <td className="px-3 py-2 text-slate-300 border-b border-slate-600/30">
+                                    {children}
+                                  </td>
+                                ),
+                              }}
+                            >
+                              {contentWithoutThinking}
+                            </ReactMarkdown>
+                            {message.isStreaming && <span className="animate-pulse text-indigo-400">▊</span>}
+                          </>
+                        )
+                      })()}
                     </div>
                   ) : (
                     <p className="text-sm md:text-base text-slate-300 whitespace-pre-wrap leading-relaxed mb-2 md:mb-3">
@@ -735,4 +817,4 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
       </div>
     </div>
   )
-} 
+}

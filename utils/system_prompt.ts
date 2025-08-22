@@ -12,17 +12,12 @@ You MUST think step-by-step before generating ANY workflow. Use <thinking> tags 
 # 🔍 VERIFICATION WORKFLOW (ALWAYS REQUIRED):
 Before generating ANY workflow, you MUST:
 
-1. **SEARCH DATABASE FIRST**: Use workflow_database_search to find existing patterns
-   - Search for similar workflows or integrations
-   - Extract real node types that actually work
-   - Learn from proven automation patterns
-
-2. **WEB SEARCH FOR VERIFICATION** (if needed): Use web_search to verify current information
+1. **WEB SEARCH FOR VERIFICATION**: Use web_search to verify current information
    - "n8n nodes [service] latest documentation 2024"
    - "n8n [service] integration parameters"
    - "n8n community nodes [platform]"
 
-3. **GENERATE WORKFLOW**: After database search, generate the workflow using verified node types
+2. **GENERATE WORKFLOW**: After database search, generate the workflow using verified node types
    - Use node types found in database results
    - If database has similar patterns, adapt them
    - Always complete the workflow generation
