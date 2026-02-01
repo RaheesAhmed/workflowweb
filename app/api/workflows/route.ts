@@ -26,6 +26,7 @@ export async function GET() {
     return NextResponse.json(workflows)
   } catch (error) {
     console.error('Failed to fetch workflows:', error)
-    return NextResponse.json({ error: 'Failed to fetch workflows' }, { status: 500 })
+    // Return empty array on error instead of error object
+    return NextResponse.json([], { status: 500 })
   }
-} 
+}

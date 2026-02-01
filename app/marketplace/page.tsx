@@ -312,9 +312,11 @@ export default function MarketplacePage() {
     try {
       const response = await fetch('/api/workflows')
       const data = await response.json()
-      setWorkflows(data)
+      // Ensure data is an array
+      setWorkflows(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Failed to fetch workflows:', error)
+      setWorkflows([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
@@ -346,6 +348,11 @@ export default function MarketplacePage() {
 
   // Get stats for the filtered workflows
   const stats = useMemo(() => {
+    // Ensure workflows is an array before using reduce
+    if (!Array.isArray(workflows)) {
+      return {}
+    }
+    
     const complexityStats = workflows.reduce((acc, workflow) => {
       acc[workflow.complexity] = (acc[workflow.complexity] || 0) + 1
       return acc
@@ -374,7 +381,7 @@ export default function MarketplacePage() {
           </h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
             Discover and download production-ready n8n workflows. 
-            Over 2000+ templates for every automation need.
+            
           </p>
         </div>
 
@@ -521,4 +528,4 @@ export default function MarketplacePage() {
       <Toaster />
     </main>
   )
-} 
+}

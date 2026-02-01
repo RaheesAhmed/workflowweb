@@ -23,9 +23,8 @@ export function Welcome({ onSelectSolution }: WelcomeProps) {
       title: "Email → Slack",
       description: "Get Slack alerts for important emails",
       prompt: "Create a workflow that sends me a Slack notification when I receive important emails",
-      gradient: "from-blue-500/10 to-cyan-500/10",
-      border: "border-blue-500/30",
-      iconBg: "from-blue-500 to-cyan-500"
+      iconColor: "text-blue-400",
+      hoverColor: "hover:bg-blue-500/10"
     },
     {
       id: 2,
@@ -33,9 +32,8 @@ export function Welcome({ onSelectSolution }: WelcomeProps) {
       title: "Drive → Dropbox", 
       description: "Auto backup files between clouds",
       prompt: "Build an automation that backs up new files from Google Drive to Dropbox",
-      gradient: "from-emerald-500/10 to-teal-500/10",
-      border: "border-emerald-500/30",
-      iconBg: "from-emerald-500 to-teal-500"
+      iconColor: "text-emerald-400",
+      hoverColor: "hover:bg-emerald-500/10"
     },
     {
       id: 3,
@@ -43,66 +41,83 @@ export function Welcome({ onSelectSolution }: WelcomeProps) {
       title: "Blog → Social",
       description: "Auto-post to all social platforms",
       prompt: "Create a workflow that posts new blog articles to all my social media accounts",
-      gradient: "from-purple-500/10 to-pink-500/10", 
-      border: "border-purple-500/30",
-      iconBg: "from-purple-500 to-pink-500"
+      iconColor: "text-purple-400",
+      hoverColor: "hover:bg-purple-500/10"
+    },
+    {
+      id: 4,
+      icon: Clock,
+      title: "Task Scheduler",
+      description: "Schedule tasks and reminders",
+      prompt: "Create a workflow that schedules recurring tasks and sends me reminders",
+      iconColor: "text-amber-400",
+      hoverColor: "hover:bg-amber-500/10"
+    },
+    {
+      id: 5,
+      icon: Zap,
+      title: "API Integrations",
+      description: "Connect different services",
+      prompt: "Build a workflow that integrates multiple APIs to automate data syncing",
+      iconColor: "text-indigo-400",
+      hoverColor: "hover:bg-indigo-500/10"
     }
   ]
 
   return (
-    <div className="p-4 md:p-6 w-full">
-      {/* Header */}
-      <div className="text-center mb-4 md:mb-6">
-        <h2 className="text-lg md:text-xl font-bold text-slate-200 mb-2">
-          🚀 Popular Automations
+    <div className="p-4 w-full max-w-4xl mx-auto">
+      {/* Compact Header */}
+      <div className="text-center mb-4">
+        <h2 className="text-xl font-bold text-slate-200 mb-1">
+          Get Started with Popular Workflows
         </h2>
-        <p className="text-xs md:text-sm text-slate-400">
-          Click any card to start building your workflow
+        <p className="text-sm text-slate-400">
+          Click to try or describe your own automation below
         </p>
       </div>
 
-      {/* Solution Cards - Responsive Grid */}
-      <div className="flex justify-center">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 max-w-4xl w-full">
-          {solutions.map((solution) => {
-            const Icon = solution.icon
-            return (
-              <Card 
-                key={solution.id} 
-                className={`bg-gradient-to-br ${solution.gradient} border ${solution.border} backdrop-blur-sm hover:border-opacity-70 hover:scale-105 transition-all duration-300 cursor-pointer group w-full`}
-                onClick={() => onSelectSolution(solution.prompt)}
-              >
-                <CardContent className="p-3 md:p-4 text-center">
-                  <div className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br ${solution.iconBg} rounded-xl flex items-center justify-center mx-auto mb-2 md:mb-3 group-hover:scale-110 transition-transform duration-200`}>
-                    <Icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                  </div>
-                  <h3 className="text-sm md:text-base font-semibold text-slate-200 mb-1 md:mb-2 group-hover:text-white transition-colors">
-                    {solution.title}
-                  </h3>
-                  <p className="text-xs text-slate-400 mb-2 md:mb-3 leading-relaxed">
-                    {solution.description}
-                  </p>
-                  <Button 
-                    size="sm" 
-                    variant="ghost"
-                    className="w-full h-7 md:h-8 text-xs md:text-sm text-slate-400 hover:text-white hover:bg-white/10 group-hover:bg-white/20"
-                  >
-                    Try Now
-                    <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform duration-200" />
-                  </Button>
-                </CardContent>
-              </Card>
-            )
-          })}
+      {/* Compact Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
+        {solutions.map((solution) => {
+          const Icon = solution.icon
+          return (
+            <button
+              key={solution.id}
+              onClick={() => onSelectSolution(solution.prompt)}
+              className={`p-3 rounded-lg bg-slate-800/40 border border-slate-700/50 hover:border-slate-600 ${solution.hoverColor} transition-all duration-200 text-left group hover:scale-[1.02]`}
+            >
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className={`p-1.5 rounded-md bg-slate-700/50 ${solution.iconColor} group-hover:scale-110 transition-transform`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <h3 className="font-medium text-slate-200 text-sm group-hover:text-white transition-colors">
+                  {solution.title}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {solution.description}
+              </p>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Or Divider */}
+      <div className="relative mb-4">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-slate-700/50"></div>
+        </div>
+        <div className="relative flex justify-center">
+          <span className="px-3 text-xs text-slate-500 bg-slate-900">or</span>
         </div>
       </div>
 
-      {/* Bottom Text */}
-      <div className="text-center mt-4 md:mt-6">
+      {/* Custom Input Hint */}
+      <div className="text-center">
         <p className="text-xs text-slate-500">
-          Or describe your own automation below ↓
+          Describe your automation idea in your own words
         </p>
       </div>
     </div>
   )
-} 
+}

@@ -13,29 +13,28 @@ import {
   Clock,
   Trash2,
   Star,
-  MoreVertical,
   Plus,
-  Calendar,
-  Filter,
-  Archive,
-  Download,
-  Share2,
-  ChevronDown,
-  ChevronRight,
   Sparkles,
   Zap,
   Volume2,
-  FileText,
   Activity,
   Play,
   Pause,
   Settings,
-  CheckCircle,
-  AlertCircle,
   Loader2,
   RefreshCw,
   Database,
-  Workflow
+  Workflow,
+  MoreHorizontal,
+  Hash,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle,
+  AlertCircle,
+  Download,
+  Share2,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react'
 
 interface ChatSession {
@@ -178,9 +177,10 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
   }
 
   const deleteSession = (sessionId: string) => {
-    if (confirm('Are you sure you want to delete this chat session?')) {
-      setSessions(prev => prev.filter(session => session.id !== sessionId))
-    }
+    setSessions(prev => prev.filter(session => session.id !== sessionId))
+    // Also remove the saved chat data from localStorage
+    const chatDataKey = `workflowai_chat_${sessionId}`
+    localStorage.removeItem(chatDataKey)
   }
 
   const createNewChat = () => {
@@ -340,212 +340,131 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
   // Mini sidebar when collapsed
   if (collapsed) {
     return (
-      <div className="h-full flex flex-col items-center py-4 md:py-6 ">
-        {/* Logo Toggle Button - Make it MUCH more prominent */}
-        <div className="mb-6 md:mb-8">
+      <div className="h-full flex flex-col items-center py-3 bg-slate-900/50">
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <Logo size={32} />
           <button
             onClick={onToggle}
-            className="p-0 hover:scale-105 transition-all duration-200 group"
+            className="p-1.5 hover:bg-slate-800/50 rounded-lg transition-colors text-slate-400 hover:text-slate-300"
             title="Expand sidebar"
           >
-            <Logo 
-              size={window.innerWidth < 768 ? 32 : 40} 
-              className="drop-shadow-lg flex-shrink-0" 
-            />
+            <PanelLeftOpen className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Simple Tab Indicators - Just dots */}
-        <div className="flex flex-col gap-3 md:gap-4 mb-6 md:mb-8">
+        <div className="flex flex-col gap-3 mb-4">
           <button
             onClick={() => setActiveTab('chats')}
-            className={`w-2 h-2 rounded-full transition-all duration-200 ${
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
               activeTab === 'chats' 
-                ? 'bg-indigo-500 scale-125' 
-                : 'bg-slate-600 hover:bg-slate-500'
+                ? 'bg-indigo-500/20 text-indigo-400' 
+                : 'text-slate-400 hover:bg-slate-800/50'
             }`}
             title="Chats"
-          />
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setActiveTab('workflows')}
-            className={`w-2 h-2 rounded-full transition-all duration-200 ${
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
               activeTab === 'workflows' 
-                ? 'bg-indigo-500 scale-125' 
-                : 'bg-slate-600 hover:bg-slate-500'
+                ? 'bg-indigo-500/20 text-indigo-400' 
+                : 'text-slate-400 hover:bg-slate-800/50'
             }`}
             title="Workflows"
-          />
+          >
+            <Workflow className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Activity Indicator */}
         <div className="mt-auto">
-          <div className={`w-2 h-2 rounded-full transition-all duration-200 ${
-            activeConnection ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'
-          }`} title={activeConnection ? 'Connected to n8n' : 'Not connected'} />
+          <div className={`w-2 h-2 rounded-full ${
+            activeConnection ? 'bg-emerald-400' : 'bg-slate-600'
+          }`} />
         </div>
       </div>
     )
   }
 
-  // Full sidebar view (existing code)
+  // Full sidebar view
   return (
-    <div className="h-full flex flex-col">
-      {/* Header with Tabs */}
-      <div className="p-3 md:p-4 border-b border-slate-700/50">
-        <div className="flex items-center justify-between mb-3 md:mb-4">
-          <div className="flex items-center gap-2 md:gap-3">
-            <button
-              onClick={onToggle}
-              className="p-1 md:p-2 hover:bg-slate-800/50 rounded-xl transition-all duration-200 group"
-              title="Collapse sidebar"
-            >
-              <Logo 
-                size={window.innerWidth < 768 ? 24 : 32} 
-                className="drop-shadow-lg group-hover:scale-105 transition-transform duration-200 flex-shrink-0" 
-              />
-            </button>
-          </div>
-          <div className="flex items-center gap-1 md:gap-2">
-            {activeTab === 'workflows' && (
-              <Button
+    <div className="h-full flex flex-col bg-slate-900/50">
+      {/* Compact Header */}
+      <div className="p-3 border-b border-slate-700/30">
+        <div className="flex items-center justify-between mb-3">
+          <Logo size={28} />
+          
+          <div className="flex items-center gap-1">
+            {activeTab === 'workflows' && activeConnection && (
+              <button
                 onClick={handleRefresh}
-                disabled={refreshing || !activeConnection}
-                size="sm"
-                variant="outline"
-                className="border-slate-600 hover:bg-slate-700 text-slate-300 h-8 w-8 md:h-9 md:w-9 p-0"
+                disabled={refreshing}
+                className="p-1.5 text-slate-400 hover:text-slate-300 hover:bg-slate-800/50 rounded-lg transition-colors disabled:opacity-50"
               >
                 {refreshing ? (
-                  <Loader2 className="w-3 h-3 md:w-4 md:h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <RefreshCw className="w-3 h-3 md:w-4 md:h-4" />
+                  <RefreshCw className="w-4 h-4" />
                 )}
-              </Button>
+              </button>
             )}
-            <Button
+            <button
               onClick={createNewChat}
-              size="sm"
-              className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border-indigo-500/20 h-8 w-8 md:h-9 md:w-9 p-0"
-              title="Start new chat"
+              className="p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
             >
-              <Plus className="w-3 h-3 md:w-4 md:h-4" />
-            </Button>
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onToggle}
+              className="p-1.5 hover:bg-slate-800/50 rounded-lg transition-colors text-slate-400 hover:text-slate-300"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Tab Toggle */}
-        <div className="flex gap-1 mb-3 md:mb-4 bg-slate-800/50 p-1 rounded-xl">
+        {/* Compact Tab Toggle */}
+        <div className="flex gap-1 mb-3 bg-slate-800/30 p-0.5 rounded-lg">
           <button
             onClick={() => setActiveTab('chats')}
-            className={`flex-1 flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
               activeTab === 'chats' 
-                ? 'bg-indigo-500 text-white shadow-lg' 
+                ? 'bg-indigo-500 text-white shadow-sm' 
                 : 'text-slate-400 hover:text-slate-300'
             }`}
           >
-            <MessageSquare className="w-3 h-3 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Chats</span>
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Chats</span>
           </button>
           <button
             onClick={() => setActiveTab('workflows')}
-            className={`flex-1 flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
               activeTab === 'workflows' 
-                ? 'bg-indigo-500 text-white shadow-lg' 
+                ? 'bg-indigo-500 text-white shadow-sm' 
                 : 'text-slate-400 hover:text-slate-300'
             }`}
           >
-            <Workflow className="w-3 h-3 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Workflows</span>
-            {activeConnection && <Badge variant="secondary" className="bg-slate-600/50 text-slate-300 text-xs ml-1">{workflows.length}</Badge>}
+            <Workflow className="w-3.5 h-3.5" />
+            <span>workflows</span>
+            {activeConnection && workflows.length > 0 && (
+              <span className="text-xs bg-slate-600/50 px-1 rounded">
+                {workflows.length}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-3 md:mb-4">
-          <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-3 h-3 md:w-4 md:h-4" />
+        {/* Compact Search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
           <Input
             placeholder={activeTab === 'chats' ? "Search chats..." : "Search workflows..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 md:pl-9 pr-3 md:pr-4 py-2 bg-slate-800/50 border-slate-600 focus:border-indigo-500 focus:ring-indigo-500/20 text-slate-200 placeholder-slate-500 text-sm md:text-base h-8 md:h-9"
+            className="pl-8 pr-3 py-2 bg-slate-800/30 border-slate-700/50 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 text-slate-200 placeholder-slate-400 text-sm h-8 rounded-lg"
           />
         </div>
-
-        {/* Filters */}
-        {activeTab === 'chats' ? (
-          <div className="flex gap-1 md:gap-2">
-            <Button
-              onClick={() => setFilterType('all')}
-              size="sm"
-              variant={filterType === 'all' ? 'default' : 'outline'}
-              className={`flex-shrink-0 h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm ${filterType === 'all' ? 
-                'bg-indigo-600 hover:bg-indigo-700 text-white' : 
-                'border-slate-600 hover:bg-slate-700 text-slate-300'
-              }`}
-            >
-              All
-            </Button>
-            <Button
-              onClick={() => setFilterType('starred')}
-              size="sm"
-              variant={filterType === 'starred' ? 'default' : 'outline'}
-              className={`flex-shrink-0 h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm ${filterType === 'starred' ? 
-                'bg-amber-600 hover:bg-amber-700 text-white' : 
-                'border-slate-600 hover:bg-slate-700 text-slate-300'
-              }`}
-            >
-              <Star className="w-3 h-3 mr-1" />
-              <span className="hidden sm:inline">Starred</span>
-            </Button>
-            <Button
-              onClick={() => setFilterType('workflows')}
-              size="sm"
-              variant={filterType === 'workflows' ? 'default' : 'outline'}
-              className={`flex-shrink-0 h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm ${filterType === 'workflows' ? 
-                'bg-emerald-600 hover:bg-emerald-700 text-white' : 
-                'border-slate-600 hover:bg-slate-700 text-slate-300'
-              }`}
-            >
-              <Zap className="w-3 h-3 mr-1" />
-              <span className="hidden sm:inline">With Workflows</span>
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-1 md:gap-2">
-            <Button
-              onClick={() => setWorkflowFilter('all')}
-              size="sm"
-              variant={workflowFilter === 'all' ? 'default' : 'outline'}
-              className={`flex-shrink-0 h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm ${workflowFilter === 'all' ? 
-                'bg-indigo-600 hover:bg-indigo-700 text-white' : 
-                'border-slate-600 hover:bg-slate-700 text-slate-300'
-              }`}
-            >
-              All
-            </Button>
-            <Button
-              onClick={() => setWorkflowFilter('active')}
-              size="sm"
-              variant={workflowFilter === 'active' ? 'default' : 'outline'}
-              className={`flex-shrink-0 h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm ${workflowFilter === 'active' ? 
-                'bg-emerald-600 hover:bg-emerald-700 text-white' : 
-                'border-slate-600 hover:bg-slate-700 text-slate-300'
-              }`}
-            >
-              Active
-            </Button>
-            <Button
-              onClick={() => setWorkflowFilter('inactive')}
-              size="sm"
-              variant={workflowFilter === 'inactive' ? 'default' : 'outline'}
-              className={`flex-shrink-0 h-7 md:h-8 px-2 md:px-3 text-xs md:text-sm ${workflowFilter === 'inactive' ? 
-                'bg-red-600 hover:bg-red-700 text-white' : 
-                'border-slate-600 hover:bg-slate-700 text-slate-300'
-              }`}
-            >
-              Inactive
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Content - Hidden Scrollbar */}
@@ -574,119 +493,72 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
               </div>
             </div>
           ) : (
-            <div className="p-2 md:p-4 space-y-2 md:space-y-3">
+            <div className="p-2 space-y-1">
               {filteredSessions.map((session) => (
-                <Card key={session.id} className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 hover:border-indigo-500/30 transition-all duration-300 group cursor-pointer" 
-                      onClick={() => onSelectChat && onSelectChat(session.id)}>
-                  <CardContent className="p-3 md:p-4">
-                    <div className="flex items-start gap-2 md:gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-slate-200 truncate group-hover:text-indigo-200 transition-colors text-sm md:text-base">
-                            {session.title}
-                          </h3>
-                          {session.isStarred && (
-                            <Star className="w-3 h-3 md:w-4 md:h-4 text-amber-400 fill-current flex-shrink-0" />
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className={`text-xs ${getTypeColor(session.type)}`}>
-                            {getTypeIcon(session.type)}
-                            <span className="ml-1 capitalize hidden sm:inline">{session.type}</span>
-                          </Badge>
-                          {session.hasWorkflows && (
-                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs">
-                              <Zap className="w-3 h-3 mr-1" />
-                              <span className="hidden sm:inline">{session.workflowCount} workflow{session.workflowCount !== 1 ? 's' : ''}</span>
-                              <span className="sm:hidden">{session.workflowCount}</span>
-                            </Badge>
-                          )}
-                        </div>
-
-                        <p className="text-xs md:text-sm text-slate-400 truncate mb-2 leading-relaxed">
-                          {session.lastMessage}
-                        </p>
-
-                        <div className="flex items-center justify-between text-xs text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {formatTimestamp(session.timestamp)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MessageSquare className="w-3 h-3" />
-                            <span className="hidden sm:inline">{session.messageCount} messages</span>
-                            <span className="sm:hidden">{session.messageCount}</span>
-                          </span>
-                        </div>
+                <div 
+                  key={session.id} 
+                  className="group relative p-3 rounded-lg bg-slate-800/20 hover:bg-slate-800/40 border border-slate-700/30 hover:border-indigo-500/30 transition-all duration-200 cursor-pointer"
+                  onClick={() => onSelectChat && onSelectChat(session.id)}
+                >
+                  {/* Main Content */}
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      {/* Title and Star */}
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium text-slate-200 text-sm truncate group-hover:text-indigo-200 transition-colors">
+                          {session.title}
+                        </h3>
+                        {session.isStarred && (
+                          <Star className="w-3 h-3 text-amber-400 fill-current flex-shrink-0" />
+                        )}
                       </div>
 
-                      <div className="flex flex-col gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => toggleStar(session.id)}
-                          className="h-6 w-6 md:h-8 md:w-8 p-0 text-slate-400 hover:text-amber-400 transition-colors"
-                        >
-                          <Star className={`w-3 h-3 md:w-4 md:h-4 ${session.isStarred ? 'fill-current text-amber-400' : ''}`} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}
-                          className="h-6 w-6 md:h-8 md:w-8 p-0 text-slate-400 hover:text-slate-300 transition-colors"
-                        >
-                          {expandedSession === session.id ? (
-                            <ChevronDown className="w-3 h-3 md:w-4 md:h-4" />
-                          ) : (
-                            <ChevronRight className="w-3 h-3 md:w-4 md:h-4" />
-                          )}
-                        </Button>
+                      {/* Badges and Message Preview */}
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${getTypeColor(session.type)}`}>
+                          {getTypeIcon(session.type)}
+                          <span className="capitalize">{session.type}</span>
+                        </span>
+                        {session.hasWorkflows && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400">
+                            <Zap className="w-2.5 h-2.5" />
+                            <span>{session.workflowCount}</span>
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-500 ml-auto">
+                          {formatTimestamp(session.timestamp)}
+                        </span>
                       </div>
+
+                      {/* Last Message Preview */}
+                      <p className="text-xs text-slate-400 truncate leading-4">
+                        {session.lastMessage}
+                      </p>
                     </div>
 
-                    {/* Expanded Actions */}
-                    {expandedSession === session.id && (
-                      <div className="mt-2 md:mt-3 pt-2 md:pt-3 border-t border-slate-700/50">
-                        <div className="grid grid-cols-2 gap-1 md:gap-2">
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectChat && onSelectChat(session.id);
-                            }}
-                            className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border-indigo-500/20 text-xs h-7 md:h-8"
-                          >
-                            <MessageSquare className="w-3 h-3 mr-1" />
-                            <span className="hidden sm:inline">Open</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border-emerald-500/20 text-xs h-7 md:h-8"
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            <span className="hidden sm:inline">Export</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border-purple-500/20 text-xs h-7 md:h-8"
-                          >
-                            <Share2 className="w-3 h-3 mr-1" />
-                            <span className="hidden sm:inline">Share</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => deleteSession(session.id)}
-                            className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border-red-500/20 text-xs h-7 md:h-8"
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            <span className="hidden sm:inline">Delete</span>
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStar(session.id);
+                        }}
+                        className="p-1 hover:bg-slate-700/50 rounded transition-colors"
+                      >
+                        <Star className={`w-3 h-3 ${session.isStarred ? 'text-amber-400 fill-current' : 'text-slate-400 hover:text-amber-400'}`} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(session.id);
+                        }}
+                        className="p-1 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )
@@ -827,4 +699,4 @@ export function ChatHistory({ collapsed = false, onToggle, onClearMessages, curr
       </div>
     </div>
   )
-} 
+}

@@ -17,6 +17,7 @@ export default function AIPlayground() {
   const { activeConnection, loading: n8nLoading, initialized } = useN8n()
   const router = useRouter()
   const [showConnectionSetup, setShowConnectionSetup] = useState(false)
+  const [hasShownConnectionPrompt, setHasShownConnectionPrompt] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [clearMessagesTrigger, setClearMessagesTrigger] = useState(0)
@@ -65,19 +66,38 @@ export default function AIPlayground() {
     }
   }, [user, authLoading, router])
 
-  // Show connection setup when user is authenticated but has no n8n connection
+  // Show connection setup ONLY ONCE when user is authenticated but has no n8n connection
   useEffect(() => {
-    if (user && initialized && !activeConnection && !n8nLoading) {
-      setShowConnectionSetup(true)
+    // Only show automatically once, and not if already shown or currently loading
+    if (user && initialized && !activeConnection && !n8nLoading && !hasShownConnectionPrompt) {
+      // Mark that we've shown the prompt
+      setHasShownConnectionPrompt(true)
+      
+      // Check if user has dismissed the prompt before (stored in localStorage)
+      const hasUserDismissedBefore = localStorage.getItem('workflowai_connection_dismissed')
+      
+      // Only show if user hasn't dismissed it before
+      if (!hasUserDismissedBefore) {
+        setShowConnectionSetup(true)
+      }
     }
-  }, [user, initialized, activeConnection, n8nLoading])
+  }, [user, initialized, activeConnection, n8nLoading, hasShownConnectionPrompt])
 
   const handleConnectionSuccess = () => {
     setShowConnectionSetup(false)
+    // Clear the dismissed flag since they connected
+    localStorage.removeItem('workflowai_connection_dismissed')
   }
 
   const handleConnectionSkip = () => {
     setShowConnectionSetup(false)
+    // Remember that user dismissed the popup
+    localStorage.setItem('workflowai_connection_dismissed', 'true')
+  }
+  
+  const handleManualConnectionSetup = () => {
+    // Manually triggered connection setup
+    setShowConnectionSetup(true)
   }
 
   const handleClearMessages = () => {
@@ -231,7 +251,7 @@ export default function AIPlayground() {
                   Connect your n8n instance to access workflows and create automations.
                 </p>
                 <button
-                  onClick={() => setShowConnectionSetup(true)}
+                  onClick={handleManualConnectionSetup}
                   className="bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2"
                 >
                   <Database className="w-3 h-3" />
@@ -294,4 +314,4 @@ export default function AIPlayground() {
       </div>
     </div>
   )
-} 
+}

@@ -71,6 +71,8 @@ interface Message {
   searchResults?: WebSearchResult[]
   searchQueries?: WebSearchQuery[]
   isStreaming?: boolean
+  thinkingContent?: string  // Add separate field for thinking content
+  isThinking?: boolean      // Track if currently in thinking block
 }
 
 interface ChatAreaProps {
@@ -288,6 +290,8 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
       }
 
       let fullContent = ''
+      let thinkingContent = ''
+      let isInThinking = false
       let citations: Citation[] = []
       let searchResults: WebSearchResult[] = []
       let searchQueries: WebSearchQuery[] = []
@@ -308,12 +312,35 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
               switch (event.type) {
                 case 'content_block_delta':
                   if (event.data.delta.type === 'text_delta') {
-                    fullContent += event.data.delta.text
+                    const deltaText = event.data.delta.text
+                    fullContent += deltaText
                     
-                    // Update the streaming message
+                    // Check for thinking tags and handle streaming
+                    if (deltaText.includes('<thinking>')) {
+                      isInThinking = true
+                      const parts = deltaText.split('<thinking>')
+                      if (parts.length > 1) {
+                        thinkingContent += parts[1]
+                      }
+                    } else if (deltaText.includes('</thinking>')) {
+                      isInThinking = false
+                      const parts = deltaText.split('</thinking>')
+                      if (parts.length > 0) {
+                        thinkingContent += parts[0]
+                      }
+                    } else if (isInThinking) {
+                      thinkingContent += deltaText
+                    }
+                    
+                    // Update the streaming message with both content and thinking
                     setMessages(prev => prev.map(msg => 
                       msg.id === assistantMessageId 
-                        ? { ...msg, content: fullContent }
+                        ? { 
+                            ...msg, 
+                            content: fullContent,
+                            thinkingContent: thinkingContent,
+                            isThinking: isInThinking
+                          }
                         : msg
                     ))
                   }
@@ -370,6 +397,8 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                       ? { 
                           ...msg, 
                           content: fullContent,
+                          thinkingContent: thinkingContent,
+                          isThinking: false,
                           isStreaming: false,
                           citations,
                           searchResults,
@@ -493,45 +522,52 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
     }
   }
 
-  // Compact thinking component - just a brain icon
-  const ThinkingBlock = ({ content, index }: { content: string; index: number }) => {
-    const [isExpanded, setIsExpanded] = useState(false)
+  // Inline expandable thinking component with streaming support
+  const ThinkingBlock = ({ content, isStreaming, isThinking }: { content: string; isStreaming?: boolean; isThinking?: boolean }) => {
+    const [isExpanded, setIsExpanded] = useState(isStreaming || false) // Auto-expand when streaming
+    
+    // Auto-expand when streaming starts
+    useEffect(() => {
+      if (isStreaming && content.length > 0) {
+        setIsExpanded(true)
+      }
+    }, [isStreaming, content])
     
     return (
-      <div className="inline-flex items-center gap-2 mb-2">
+      <div className="mb-3">
+        {/* Thinking Toggle Button */}
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="h-6 w-6 p-0 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30"
-          title="View Thinking Process"
+          className={`h-7 px-2 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-md text-purple-400 hover:text-purple-300 transition-all duration-200 flex items-center gap-1.5 ${
+            isThinking ? 'animate-pulse' : ''
+          }`}
         >
-          <Brain className="w-3 h-3 text-purple-400" />
+          <Brain className={`w-3.5 h-3.5 ${isThinking ? 'animate-spin' : ''}`} />
+          <span className="text-xs font-medium">
+            {isThinking ? 'Thinking...' : 'Thinking'}
+          </span>
+          {isExpanded ? (
+            <ChevronDown className="w-3 h-3 ml-0.5" />
+          ) : (
+            <ChevronRight className="w-3 h-3 ml-0.5" />
+          )}
         </Button>
         
+        {/* Expanded Thinking Content */}
         {isExpanded && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setIsExpanded(false)}>
-            <div className="bg-slate-800 border border-purple-500/30 rounded-lg max-w-2xl max-h-96 overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-3 border-b border-purple-500/20 bg-purple-500/10">
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-purple-400" />
-                  <span className="text-sm font-medium text-purple-300">Thinking Process</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsExpanded(false)}
-                  className="h-6 w-6 p-0 text-slate-400 hover:text-slate-300"
-                >
-                  ×
-                </Button>
-              </div>
-              <div className="p-4 overflow-y-auto max-h-80">
-                <pre className="text-sm text-purple-200 whitespace-pre-wrap font-mono">
-                  {content}
-                </pre>
-              </div>
+          <div className="mt-2 ml-0 bg-purple-500/5 border border-purple-500/20 rounded-lg p-3 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-purple-500/10">
+              <Brain className={`w-3.5 h-3.5 text-purple-400 ${isThinking ? 'animate-spin' : ''}`} />
+              <span className="text-xs font-medium text-purple-300">
+                {isThinking ? 'AI is thinking...' : 'AI Thinking Process'}
+              </span>
             </div>
+            <pre className="text-xs text-purple-200/90 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+              {content}
+              {isThinking && <span className="animate-pulse text-purple-400">▊</span>}
+            </pre>
           </div>
         )}
       </div>
@@ -597,14 +633,25 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                   {message.type === 'assistant' ? (
                     <div className="text-sm md:text-base text-slate-300 leading-relaxed mb-2 md:mb-3 prose prose-invert prose-sm md:prose-base max-w-none">
                       {(() => {
+                        // Parse thinking content from the message
                         const { hasThinking, thinkingBlocks, contentWithoutThinking } = parseThinkingContent(message.content)
+                        
+                        // Use separate thinking content if available (for streaming), otherwise use parsed
+                        const thinkingToShow = message.thinkingContent || (thinkingBlocks[0]?.content || '')
+                        
+                        // Always use content without thinking tags for main display
+                        const mainContent = contentWithoutThinking
                         
                         return (
                           <>
-                            {/* Render thinking blocks first */}
-                            {hasThinking && thinkingBlocks.map((block, index) => (
-                              <ThinkingBlock key={index} content={block.content} index={index} />
-                            ))}
+                            {/* Render thinking block only if there's thinking content */}
+                            {(thinkingToShow.length > 0) && (
+                              <ThinkingBlock 
+                                content={thinkingToShow} 
+                                isStreaming={message.isStreaming}
+                                isThinking={message.isThinking}
+                              />
+                            )}
                             
                             {/* Render main content without thinking tags */}
                             <ReactMarkdown 
@@ -676,9 +723,9 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
                                 ),
                               }}
                             >
-                              {contentWithoutThinking}
+                              {mainContent}
                             </ReactMarkdown>
-                            {message.isStreaming && <span className="animate-pulse text-indigo-400">▊</span>}
+                            {message.isStreaming && !message.isThinking && <span className="animate-pulse text-indigo-400">▊</span>}
                           </>
                         )
                       })()}
@@ -801,19 +848,30 @@ export function ChatArea({ className, clearMessagesTrigger, onChatDataChange, lo
             />
           </div>
 
-          {/* Send Button */}
-          <Button
-            onClick={() => handleSendMessage(inputText)}
-            disabled={!inputText.trim() || isTyping}
-            size="sm"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 p-0 rounded-md flex-shrink-0"
-          >
-            {isTyping ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </Button>
+          {/* Send/Stop Button */}
+          {currentStreamingId ? (
+            <Button
+              onClick={stopCurrentStream}
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white h-8 w-8 p-0 rounded-md flex-shrink-0 transition-all duration-200"
+              title="Stop streaming"
+            >
+              <StopCircle className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleSendMessage(inputText)}
+              disabled={!inputText.trim() || isTyping}
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 p-0 rounded-md flex-shrink-0 transition-all duration-200"
+            >
+              {isTyping ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          )}
 
         </div>
       </div>
